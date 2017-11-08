@@ -1,14 +1,25 @@
 node {
-   stage 'Checkout the source code '
-   echo "Source code checked"
-   stage 'Run unit tests'
-   echo 'Running Unit tests'
-   stage 'Run acceptance tests'
-   echo 'Running acceptance tests'
-   stage 'deploy to test environment'
-   echo 'deploying app to test'
-   stage 'Run performace-Load test' 
-   echo 'Running performance and load test' 
-   stage 'deploy to prod' 
-   echo 'Deployed to Production'
+    def server = Artifactory.server 'JFrogArtifactory'
+    def rtMaven = Artifactory.newMavenBuild()
+    def buildInfo
+
+    stage ('Clone') {
+        git url: 'https://github.com/jfrogdev/project-examples.git'
+    }
+
+    stage ('Artifactory configuration') {
+        rtMaven.tool = 'Maven' // Tool name from Jenkins configuration
+        rtMaven.deployer releaseRepo: 'libs-release-local', snapshotRepo: 'libs-snapshot-local', server: server
+        rtMaven.resolver releaseRepo: 'libs-release', snapshotRepo: 'libs-snapshot', server: server
+        buildInfo = Artifactory.newBuildInfo()
+        buildInfo.env.capture = true
+    }
+
+    stage ('Exec Maven') {
+        rtMaven.run pom: 'maven-example/pom.xml', goals: 'clean install', buildInfo: buildInfo
+    }
+
+    stage ('Publish build info') {
+        server.publishBuildInfo buildInfo
+    }
 }
